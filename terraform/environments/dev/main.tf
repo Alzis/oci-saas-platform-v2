@@ -26,12 +26,13 @@ module "network" {
   vcn_cidr       = "10.0.0.0/16"
   subnet_cidr    = "10.0.1.0/24"
   tags           = var.tags
+  ssh_source_cidr = var.ssh_source_cidr
 }
 
 module "compute" {
   source              = "../../modules/compute"
   compartment_id      = var.compartment_ocid
-  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
+  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[1].name
   instance_shape      = "VM.Standard.E2.1.Micro"
   project_prefix      = var.project_prefix
   ssh_public_key      = var.ssh_public_key
@@ -50,7 +51,7 @@ resource "oci_objectstorage_bucket" "frontend_bucket" {
   namespace      = data.oci_objectstorage_namespace.ns.namespace
   name           = "${var.project_prefix}-frontend-bucket"
   access_type    = "ObjectReadWithoutList"
-  tags           = var.tags
+  freeform_tags  = var.tags
 
   lifecycle {
     prevent_destroy = true

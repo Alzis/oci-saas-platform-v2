@@ -1,39 +1,46 @@
-variable "tenancy_ocid" {
+variable "compartment_id" {
+  description = "The OCID of the compartment to create the instance in."
   type        = string
-  description = "The OCID of the tenancy."
 }
 
-variable "user_ocid" {
+variable "availability_domain" {
+  description = "The availability domain to create the instance in."
   type        = string
-  description = "The OCID of the user."
 }
 
-variable "fingerprint" {
+variable "instance_shape" {
+  description = "The shape for the compute instance."
   type        = string
-  description = "The fingerprint for the API key."
 }
 
-variable "private_key_path" {
+variable "project_prefix" {
+  description = "A prefix to apply to the instance display name."
   type        = string
-  description = "The path to the private key for the API."
 }
 
-variable "compartment_ocid" {
+variable "subnet_id" {
+  description = "The OCID of the subnet to create the VNIC in."
   type        = string
-  description = "The OCID of the compartment to create resources in."
+}
+
+variable "nsg_id" {
+  description = "The OCID of the Network Security Group to associate with the VNIC."
+  type        = string
 }
 
 variable "ssh_public_key" {
-  type        = string
   description = "The SSH public key to use for the compute instance."
+  type        = string
   sensitive   = true
 }
-variable "ssh_private_key_path" {
+
+variable "user_data_base64" {
+  description = "The base64 encoded cloud-init script."
   type        = string
-  description = "The path to the SSH private key used to access the compute instance."
 }
 
-variable "region" {
-  type        = string
-  description = "The OCI region."
+variable "tags" {
+  description = "A map of tags to apply to all resources."
+  type        = map(string)
+  default     = {}
 }
