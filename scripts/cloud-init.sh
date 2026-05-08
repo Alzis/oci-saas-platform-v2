@@ -1,24 +1,32 @@
 #!/bin/bash
 set -e
 
+# 1. Evita que o Ubuntu abra janelas interativas durante o apt upgrade
+export DEBIAN_FRONTEND=noninteractive
+
 # Log everything to a file
 exec > >(tee /var/log/cloud-init-output.log|logger -t user-data -s 2>/dev/console) 2>&1
 
 echo "--- Starting Cloud-Init Script ---"
 
-# Force apt to use IPv4. This can help in environments where IPv6 is not fully configured.
 echo "--- Forcing apt to use IPv4 ---"
 echo 'Acquire::ForceIPv4 "true";' | tee /etc/apt/apt.conf.d/99force-ipv4
 
-# 1. System Update and Basic Tools
+# 2. Update e Upgrade com flags que forçam o uso das configurações atuais (sem travar)
 apt-get update
-apt-get upgrade -y
+apt-get upgrade -y -o Dpkg::Options::="--force-confold"
+
+# 3. Instalação de ferramentas básicas
 apt-get install -y apt-transport-https ca-certificates curl software-properties-common git
 
-# 2. Install Docker
+# --- Restante do seu script de Docker ---
 echo "--- Installing Docker ---"
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+# Use /etc/apt/keyrings (padrão moderno do Docker) para evitar avisos de segurança
+mkdir -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker-archive-keyring.gpg
+
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+
 apt-get update
 apt-get install -y docker-ce docker-ce-cli containerd.io
 

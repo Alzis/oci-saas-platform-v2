@@ -53,9 +53,10 @@ resource "oci_objectstorage_bucket" "frontend_bucket" {
   access_type    = "ObjectReadWithoutList"
   freeform_tags  = var.tags
 
-  lifecycle {
-    prevent_destroy = true
-  }
+  # Em PRODUCAO Remova ou comente estas linhas abaixo:
+  # lifecycle {
+  #   prevent_destroy = true
+  # }
 }
 
 resource "oci_objectstorage_object" "frontend_index" {
