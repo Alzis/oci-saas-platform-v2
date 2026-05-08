@@ -6,6 +6,10 @@ exec > >(tee /var/log/cloud-init-output.log|logger -t user-data -s 2>/dev/consol
 
 echo "--- Starting Cloud-Init Script ---"
 
+# Force apt to use IPv4. This can help in environments where IPv6 is not fully configured.
+echo "--- Forcing apt to use IPv4 ---"
+echo 'Acquire::ForceIPv4 "true";' | tee /etc/apt/apt.conf.d/99force-ipv4
+
 # 1. System Update and Basic Tools
 apt-get update
 apt-get upgrade -y
