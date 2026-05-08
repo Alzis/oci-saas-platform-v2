@@ -35,7 +35,7 @@ docker compose version
 # 4. Setup Application Directory
 echo "--- Setting up application directory ---"
 APP_DIR="/opt/saas-platform"
-REPO_URL="https://github.com/YOUR_USERNAME/YOUR_REPO.git" # <-- CHANGE THIS
+REPO_URL="https://github.com/Alzis/oci-saas-platform-v2.git" # <-- CHANGE THIS
 
 mkdir -p ${APP_DIR}
 chown -R ubuntu:ubuntu ${APP_DIR}

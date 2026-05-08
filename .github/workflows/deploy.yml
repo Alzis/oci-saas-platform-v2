@@ -46,7 +46,7 @@ jobs:
           script: |
             set -e
             APP_DIR="/opt/saas-platform"
-            REPO_URL="https://github.com/YOUR_USERNAME/YOUR_REPO.git" # <-- MUDE PARA SEU REPO
+            REPO_URL="https://github.com/Alzis/oci-saas-platform-v2.git" # <-- MUDE PARA SEU REPO
             
             # Clona o repositório se não existir, senão atualiza
             if [ ! -d "$APP_DIR/.git" ]; then
