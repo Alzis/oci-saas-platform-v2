@@ -62,3 +62,27 @@ echo "--- Cloud-Init Script Finished Successfully ---"
 
 # The deployment itself (cloning the repo and running docker compose)
 # will be handled by the GitHub Actions pipeline.
+
+# --- 6. Healthcheck ---
+echo "--- Running Healthcheck ---"
+
+# Verifica se o Docker está respondendo
+if docker ps > /dev/null 2>&1; then
+    echo "✅ Docker: OK"
+else
+    echo "❌ Docker: FAILED"
+    exit 1
+fi
+
+# Verifica se o Compose está instalado
+if docker compose version > /dev/null 2>&1; then
+    echo "✅ Docker Compose: OK"
+else
+    echo "❌ Docker Compose: FAILED"
+    exit 1
+fi
+
+# Cria um marcador de sucesso para o seu pipeline saber que acabou
+touch /var/log/cloud-init-done
+
+echo "--- Cloud-Init Script Finished Successfully at $(date) ---"
