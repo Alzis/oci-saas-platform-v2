@@ -1,0 +1,67 @@
+name: Deploy to OCI VM
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: npm install
+
+      # Adicione aqui passos de lint e teste
+      # - name: Lint code
+      #   run: npm run lint
+      # - name: Run tests
+      #   run: npm test
+
+  deploy:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to VM via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.OCI_VM_HOST }}
+          username: ${{ secrets.OCI_VM_USER }}
+          key: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
+          env:
+            # Passa os secrets do GitHub para o script
+            DB_USER: ${{ secrets.DB_USER }}
+            DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+            DB_DATABASE: ${{ secrets.DB_DATABASE }}
+            REDIS_URL: ${{ secrets.REDIS_URL }}
+          script: |
+            set -e
+            APP_DIR="/opt/saas-platform"
+            REPO_URL="https://github.com/YOUR_USERNAME/YOUR_REPO.git" # <-- MUDE PARA SEU REPO
+            
+            # Clona o repositório se não existir, senão atualiza
+            if [ ! -d "$APP_DIR/.git" ]; then
+              git clone $REPO_URL $APP_DIR
+            fi
+            cd $APP_DIR
+            git pull origin main
+
+            # Cria o arquivo .env com os secrets
+            echo "Creating .env file..."
+            echo "DB_USER=${DB_USER}" > deploy/.env
+            echo "DB_PASSWORD=${DB_PASSWORD}" >> deploy/.env
+            echo "DB_DATABASE=${DB_DATABASE}" >> deploy/.env
+            echo "REDIS_URL=${REDIS_URL}" >> deploy/.env
+            echo "Done."
+            
+            # Inicia/Atualiza todos os serviços
+            docker compose -f deploy/docker-compose.yml up -d --build --force-recreate

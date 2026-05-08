@@ -1,0 +1,147 @@
+version: '3.9'
+
+services:
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    restart: always
+    networks:
+      - backend-net
+    environment:
+      - REDIS_URL=${REDIS_URL}
+      - POSTGRES_HOST=db
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_DATABASE}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ../backend:/app # Para desenvolvimento. Remova em produção.
+      - /app/node_modules # Evita que o node_modules local sobrescreva o do container
+
+  redis:
+    image: redis:7
+    restart: always
+    networks:
+      - backend-net
+
+  db:
+    image: postgres:15 # Usando PostgreSQL como exemplo de DB robusto
+    restart: always
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_DATABASE}
+    networks:
+      - backend-net
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_DATABASE}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nginx:
+    image: nginx:latest
+    restart: always
+    ports:
+      - "80:80"
+      # - "443:443" # Descomente quando tiver SSL
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      # - ./certbot/conf:/etc/letsencrypt # Para SSL
+      # - ./certbot/www:/var/www/certbot # Para SSL
+    networks:
+      - frontend-net
+      - backend-net # Para alcançar a API
+    depends_on:
+      - api
+
+  # --- STACK DE OBSERVABILIDADE ---
+
+  prometheus:
+    image: prom/prometheus:v2.47.2
+    restart: always
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - backend-net
+
+  grafana:
+    image: grafana/grafana:10.2.2
+    restart: always
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - backend-net
+    depends_on:
+      - prometheus
+      - loki
+
+  loki:
+    image: grafana/loki:2.9.2
+    restart: always
+    volumes:
+      - ./monitoring/loki/loki-config.yml:/etc/loki/local-config.yaml
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - backend-net
+
+  promtail:
+    image: grafana/promtail:2.9.2
+    restart: always
+    volumes:
+      - /var/log:/var/log # Logs do host
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./monitoring/promtail/promtail-config.yml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - backend-net
+
+  node-exporter:
+    image: prom/node-exporter:v1.7.0
+    restart: always
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+    pid: host
+    networks:
+      - backend-net
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.2
+    restart: always
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    devices:
+      - /dev/kmsg
+    networks:
+      - backend-net
+
+networks:
+  frontend-net:
+    driver: bridge
+  backend-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  prometheus_data:
+  grafana_data:
