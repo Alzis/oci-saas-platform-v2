@@ -77,3 +77,13 @@ resource "oci_core_network_security_group_security_rule" "allow_web" {
   }
   # Adicione a porta 443 quando for implementar SSL
 }
+
+# Regra de SAÍDA (Egress) - Essencial para baixar o Docker e atualizações
+resource "oci_core_network_security_group_security_rule" "allow_all_egress" {
+  network_security_group_id = oci_core_network_security_group.app_nsg.id
+  direction                 = "EGRESS"
+  protocol                  = "all" # Permite todos os protocolos de saída
+  destination               = "0.0.0.0/0"
+  destination_type          = "CIDR_BLOCK"
+  description               = "Allow all outbound traffic"
+}

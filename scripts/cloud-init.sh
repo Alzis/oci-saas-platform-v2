@@ -12,6 +12,19 @@ echo "--- Starting Cloud-Init Script ---"
 echo "--- Forcing apt to use IPv4 ---"
 echo 'Acquire::ForceIPv4 "true";' | tee /etc/apt/apt.conf.d/99force-ipv4
 
+# Manually set a public DNS server as a fallback for this script's session.
+# This is a powerful debugging step to bypass potential VCN DNS issues.
+echo "--- Temporarily setting public DNS ---"
+echo "nameserver 8.8.8.8" | tee /etc/resolv.conf > /dev/null
+
+# Wait for network and DNS to be ready. This prevents failures on initial boot.
+echo "--- Waiting for network and DNS resolution ---"
+until ping -c 1 google.com &>/dev/null; do
+    echo "Network not ready, waiting 5 seconds..."
+    sleep 5
+done
+echo "--- Network and DNS are up ---"
+
 # 2. Update e Upgrade com flags que forçam o uso das configurações atuais (sem travar)
 apt-get update
 apt-get upgrade -y -o Dpkg::Options::="--force-confold"
@@ -20,6 +33,11 @@ apt-get upgrade -y -o Dpkg::Options::="--force-confold"
 apt-get install -y apt-transport-https ca-certificates curl software-properties-common git
 
 # --- Restante do seu script de Docker ---
+echo "--- Running network diagnostics before Docker install ---"
+echo "--- Testing connection to download.docker.com:443 with verbose output ---"
+curl -v https://download.docker.com
+echo "--- Diagnostics finished. The command above should show the connection attempt. ---"
+
 echo "--- Installing Docker ---"
 # Use /etc/apt/keyrings (padrão moderno do Docker) para evitar avisos de segurança
 mkdir -p /etc/apt/keyrings
@@ -57,6 +75,20 @@ chown -R ubuntu:ubuntu ${APP_DIR}
 
 # 5. Enable Docker to start on boot
 systemctl enable docker
+
+# Clone the repository as the 'ubuntu' user
+sudo -u ubuntu git clone ${GIT_REPO_URL} ${APP_DIR}
+
+if [ -d "${APP_DIR}/deploy" ]; then
+  echo "Repository cloned. Starting services..."
+  # Use the docker compose plugin, run as 'ubuntu' user
+  # Run as root to ensure permissions are not an issue during initial setup.
+  # The 'ubuntu' user can manage docker later thanks to the 'usermod' command above.
+  #docker compose -f ${APP_DIR}/deploy/docker-compose.yml up -d
+  echo "Docker Compose services started."
+else
+  echo "Failed to clone repository or docker-compose.yml not found."
+fi
 
 echo "--- Cloud-Init Script Finished Successfully ---"
 

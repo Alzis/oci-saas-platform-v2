@@ -15,17 +15,23 @@ provider "oci" {
   user_ocid        = var.user_ocid
 }
 
+# --- Dados e Namespaces ---
 data "oci_identity_availability_domains" "ads" {
   compartment_id = var.compartment_ocid
 }
 
-module "network" {
-  source         = "../../modules/network"
+data "oci_objectstorage_namespace" "ns" {
   compartment_id = var.compartment_ocid
-  project_prefix = var.project_prefix
-  vcn_cidr       = "10.0.0.0/16"
-  subnet_cidr    = "10.0.1.0/24"
-  tags           = var.tags
+}
+
+# --- Módulos de Infraestrutura ---
+module "network" {
+  source          = "../../modules/network"
+  compartment_id  = var.compartment_ocid
+  project_prefix  = var.project_prefix
+  vcn_cidr        = "10.0.0.0/16"
+  subnet_cidr     = "10.0.1.0/24"
+  tags            = var.tags
   ssh_source_cidr = var.ssh_source_cidr
 }
 
@@ -42,21 +48,13 @@ module "compute" {
   tags                = var.tags
 }
 
-data "oci_objectstorage_namespace" "ns" {
-  compartment_id = var.compartment_ocid
-}
-
+# --- Storage: Frontend ---
 resource "oci_objectstorage_bucket" "frontend_bucket" {
   compartment_id = var.compartment_ocid
   namespace      = data.oci_objectstorage_namespace.ns.namespace
   name           = "${var.project_prefix}-frontend-bucket"
   access_type    = "ObjectReadWithoutList"
   freeform_tags  = var.tags
-
-  # Em PRODUCAO Remova ou comente estas linhas abaixo:
-  # lifecycle {
-  #   prevent_destroy = true
-  # }
 }
 
 resource "oci_objectstorage_object" "frontend_index" {
@@ -68,9 +66,36 @@ resource "oci_objectstorage_object" "frontend_index" {
   depends_on   = [module.compute]
 }
 
+# --- Storage: InsumoPro (Acessível pela VM) ---
+resource "oci_objectstorage_bucket" "insumopro_bucket" {
+  compartment_id = var.compartment_ocid
+  namespace      = data.oci_objectstorage_namespace.ns.namespace
+  name           = "${var.project_prefix}-insumopro"
+  access_type    = "NoPublicAccess"
+  freeform_tags  = var.tags
+}
+
+# --- IAM: Permissões para a VM acessar o Bucket ---
+resource "oci_identity_dynamic_group" "backend_dg" {
+  compartment_id = var.tenancy_ocid
+  name           = "${var.project_prefix}-backend-dg"
+  description    = "Grupo para a VM acessar o Object Storage"
+  matching_rule  = "ALL {instance.id = '${module.compute.instance_id}'}"
+}
+
+resource "oci_identity_policy" "backend_storage_policy" {
+  compartment_id = var.compartment_ocid
+  name           = "${var.project_prefix}-storage-policy"
+  description    = "Permite a VM gerenciar objetos no bucket insumopro"
+
+  statements = [
+    "Allow dynamic-group ${oci_identity_dynamic_group.backend_dg.name} to manage objects in compartment id ${var.compartment_ocid} where target.bucket.name='${oci_objectstorage_bucket.insumopro_bucket.name}'"
+  ]
+}
+
+# --- Outputs ---
 output "instance_public_ip" {
-  description = "Public IP address of the application VM."
-  value       = module.compute.public_ip
+  value = module.compute.public_ip
 }
 
 output "frontend_url" {
@@ -78,8 +103,11 @@ output "frontend_url" {
   value       = "https://objectstorage.${var.region}.oraclecloud.com/n/${data.oci_objectstorage_namespace.ns.namespace}/b/${oci_objectstorage_bucket.frontend_bucket.name}/o/index.html"
 }
 
+output "insumopro_bucket_name" {
+  value = oci_objectstorage_bucket.insumopro_bucket.name
+}
+
 output "ssh_command" {
-  description = "SSH command to connect to the VM."
-  value       = "ssh -i ${var.ssh_private_key_path} ubuntu@${module.compute.public_ip}"
-  sensitive   = true
+  value     = "ssh -i ${var.ssh_private_key_path} ubuntu@${module.compute.public_ip}"
+  sensitive = true
 }
